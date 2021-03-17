@@ -17,15 +17,18 @@ function definePrototype(object, key, value) {
     set: (newVal) => {
       if (value === newVal) return
       value = newVal
-      console.log('val is changed')
-      // 添加订阅者
+      dep.notify() // 数据变化 通知订阅者
     },
     get: () => {
-      dep.notify()
-      return 'it is' + value 
+      if (Dep.target) {
+        dep.addSub(Dep.target) // 添加一个订阅者
+      }
+      return value 
     }
   })
 }
+
+Dep.target = null
 
 /**
  * 收集订阅者
@@ -34,8 +37,10 @@ function Dep() {
   this.subs = []
 }
 Dep.prototype = {
-  addSub: (sub) => this.subs.push(sub),
-  notify: () => {
+  addSub: function(sub) {
+    this.subs.push(sub)
+  },
+  notify: function() {
     this.subs.forEach(sub => sub.update())
   }
 }
@@ -45,12 +50,37 @@ Dep.prototype = {
  */
 function Watcher(vm,exp,cb) {
   this.cb = cb
-  
+  this.vm = vm
+  this.exp = exp
+  this.value = this.get()
 }
 
+Watcher.prototype = {
+  update: function() {
+    this.run()
+  },
+  run: function() {
+    var value = this.vm.data[this.exp]
+    var oldVal = this.value
+    if (value !== oldVal) {
+      this.value = value
+      this.cb.call(this.vm, value, oldVal)
+    }
+  },
+  get: function() {
+    Dep.target = this
+    var value = this.vm.data[this.exp]
+    Dep.target = null
+    return value
+  }
+}
 
-
-
-
-var test = {name: 'leon'}
-observe(test)
+function seed(data,el,exp) {
+  this.data = data
+  observe(data)
+  el.innerHTML = this.data[exp]
+  new Watcher(this, exp, function(value) {
+    el.innerHTML = value
+  })
+  return this
+}
